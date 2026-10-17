@@ -1,12 +1,14 @@
-# Install cuML/CuPy from the RAPIDS channel for the CUDA version on the cluster.
-numpy
-pandas
-openpyxl
-scikit-learn
-torch
-h5py
-scipy
-matplotlib
-pillow
-tiffslide
-shapely
+# Direct SVC/labeling/inference dependencies; setup_cort_med_env.sh adds the NVIDIA index.
+# PyTorch and torchvision are installed separately from the CUDA 12.9 PyTorch index.
+cuml-cu12==26.2.0
+cupy-cuda12x==14.2.0
+numpy==2.2.6
+pandas==2.3.3
+openpyxl==3.1.5
+scikit-learn==1.7.2
+h5py==3.16.0
+scipy==1.15.3
+matplotlib==3.10.9
+pillow==12.3.0
+tiffslide==2.5.1
+shapely==2.1.2

@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from scripts.h5_svm import (CS, FEATURE_ROOT, KPMP, c_name, decision_scores, fit_svc,
+from .h5_svm import (CS, FEATURE_ROOT, KPMP, c_name, decision_scores, fit_svc,
                         load_split, metric_row, metrics, save_cm, save_json,
                         timestamp, workbook_rows)
 

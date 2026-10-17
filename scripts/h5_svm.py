@@ -155,7 +155,7 @@ def gpu_modules():
             raise RuntimeError("Exactly one visible GPU is required")
         return cp, StandardScaler, SVC
     except Exception as error:
-        raise RuntimeError("Use one GPU compute node with the rapids_svc environment") from error
+        raise RuntimeError("Use one GPU compute node with the project RAPIDS/CuPy environment") from error
 
 
 def fit_svc(x: np.ndarray, y: np.ndarray, c: float, kernel: str, cache_mb: int):

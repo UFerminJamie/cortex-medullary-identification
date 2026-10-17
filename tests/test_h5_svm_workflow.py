@@ -10,7 +10,7 @@ import h5py
 import numpy as np
 from PIL import Image
 
-from inference import aggregate, map_payload, save_visualizations
+from scripts.inference import aggregate, map_payload, save_visualizations
 from scripts.h5_svm import load_tiles, metrics
 
 

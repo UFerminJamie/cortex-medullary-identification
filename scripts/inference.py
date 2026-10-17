@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
-from scripts.h5_svm import (FEATURE_ROOT, KPMP, decision_scores, load_model, load_tiles,
+from .h5_svm import (FEATURE_ROOT, KPMP, decision_scores, load_model, load_tiles,
                         safe_name, save_json, workbook_rows)
 
 

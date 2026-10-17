@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from scripts.h5_svm import (FEATURE_ROOT, KPMP, c_name, decision_scores, fit_svc,
+from .h5_svm import (FEATURE_ROOT, KPMP, c_name, decision_scores, fit_svc,
                         load_split, metric_row, metrics, save_cm, save_model,
                         workbook_rows)
 
@@ -19,8 +19,8 @@ def main() -> None:
     p.add_argument("--tile-mode", choices=("all", "no-overlap"), default="all")
     p.add_argument("--include-val", action="store_true")
     p.add_argument("--model-dir", type=Path, default=KPMP / "output/model_weights")
-    p.add_argument("--cache-mb", type=int, default=4096)
-    p.add_argument("--batch-size", type=int, default=32768)
+    p.add_argument("--cache-mb", type=int, default=8192)
+    p.add_argument("--batch-size", type=int, default=65536)
     args = p.parse_args()
     if args.C <= 0 or args.cache_mb <= 0:
         p.error("--C and --cache-mb must be positive")

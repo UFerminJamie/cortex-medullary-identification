@@ -28,7 +28,7 @@ module load conda
 conda activate /blue/pinaki.sarder/j.fermin/conda/envs/cort_med_gpu
 ```
 
-The setup job installs the local `TRIDENT/` checkout into the shared environment. The launchers use this environment by default; `CORT_MED_CONDA_ENV` overrides its path.
+The setup job creates `cort_med_gpu` directly with Python 3.10, CUDA 12.9 PyTorch, the pinned cuML/CuPy and SVC dependencies in `requirements-svc.txt`, and the local `TRIDENT/` checkout. It does not use `rapids_svc`. The launchers use this environment by default; `CORT_MED_CONDA_ENV` overrides its path, including during setup. Submit the setup job on a GPU node to run its final import and device check.
 
 ## Process WSIs with TRIDENT
 
@@ -134,7 +134,7 @@ Use the `C` and kernel selected by the grid search, or choose them before lookin
 sbatch svc_train_single.sh --xlsx "$SPLIT_XLSX" --h5-dir "$H5_DIR" --C 2 --kernel rbf --tile-mode all --include-val --model-dir "$JOB_DIR/output/model_weights"
 ```
 
-The model fits on train plus validation, then evaluates once on test. It saves `svc_2_rbf.pkl`, a metrics workbook, and train/test confusion matrix PNGs under `--model-dir`. Use this model with `inference.py`.
+The model fits on train plus validation, then evaluates once on test. It saves `svc_2_rbf.pkl`, a metrics workbook, and train/test confusion matrix PNGs under `--model-dir`. Use this model with `inference.sh` or `python -m scripts.inference`.
 
 Flags:
 
