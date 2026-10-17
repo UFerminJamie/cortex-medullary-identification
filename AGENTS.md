@@ -75,6 +75,11 @@ The active Python modules and optional H5 QA utilities live in `scripts/`; the r
 - Do not commit, push, publish, or deploy unless the user explicitly requests it.
 - Ask before destructive actions or actions that affect external systems.
 
+## Git command handoff
+- At the end of every task that changes project files, provide copy-ready, ordered commands to create a new branch, stage the intended files, review and commit them, push the branch, open a GitHub pull request, and merge that pull request.
+- Tailor the commands to the current branch, remote, and changed files. Base the pull request on the branch used to create the new branch unless the user specifies another base. State any required tools or authentication that are unavailable locally.
+- Provide these commands for the user to run. Do not run branch creation, staging, commits, pushes, pull-request creation, or merges unless the user specifically asks you to execute them on their behalf.
+
 ## Completion summary
 When finished, report:
 - What changed and why.

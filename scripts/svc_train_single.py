@@ -37,16 +37,17 @@ def main() -> None:
     model["metadata"].update({"tile_mode": args.tile_mode, "fitted_splits": ["train", "val"] if args.include_val else ["train"],
                                "xlsx": str(args.xlsx.resolve()), "h5_dir": str(args.h5_dir.resolve())})
     name = f"svc_{c_name(args.C)}_{args.kernel}"
-    path = args.model_dir / f"{name}.pkl"
+    model_dir = args.model_dir / name
+    path = model_dir / f"{name}.pkl"
     save_model(path, model)
     train = metrics(train_y, decision_scores(model, train_x, args.batch_size))
     test = metrics(test_y, decision_scores(model, test_x, args.batch_size))
-    save_cm(args.model_dir / f"{name}_train_confusion_matrix.png", train, f"{name} train")
-    save_cm(args.model_dir / f"{name}_test_confusion_matrix.png", test, f"{name} test")
+    save_cm(model_dir / f"{name}_train_confusion_matrix.png", train, f"{name} train")
+    save_cm(model_dir / f"{name}_test_confusion_matrix.png", test, f"{name} test")
     import pandas as pd
     pd.DataFrame([{"C": args.C, "kernel": args.kernel, "tile_mode": args.tile_mode,
                    **metric_row("train", train), **metric_row("test", test)}]).to_excel(
-        args.model_dir / f"{name}_metrics.xlsx", index=False)
+        model_dir / f"{name}_metrics.xlsx", index=False)
     print(f"Saved {path}; test balanced accuracy={test['balanced_accuracy']:.4f}", flush=True)
 
 

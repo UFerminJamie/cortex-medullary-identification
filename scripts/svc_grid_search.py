@@ -21,8 +21,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--tile-mode", choices=("all", "no-overlap"), default="all")
     p.add_argument("--include-val", action="store_true", help="Refit each candidate on train+val after validation scoring")
     p.add_argument("--output-root", type=Path, default=KPMP / "grid_search_results")
-    p.add_argument("--cache-mb", type=int, default=4096)
-    p.add_argument("--batch-size", type=int, default=32768)
+    p.add_argument("--cache-mb", type=int, default=8192)
+    p.add_argument("--batch-size", type=int, default=65536)
     return p
 
 
@@ -45,6 +45,7 @@ def main() -> None:
         fit_x, fit_y = train_x, train_y
     records = []
     for kernel in ("linear", "rbf"):
+    # for kernel in ["rbf"]:
         for c in CS:
             name = f"svc_{c_name(c)}_{kernel}"
             print(f"Fitting {name} (validation fit)", flush=True)

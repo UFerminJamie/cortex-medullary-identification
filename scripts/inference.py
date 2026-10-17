@@ -8,8 +8,14 @@ from pathlib import Path
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
+from .gt_visualization import _polygons
 from .h5_svm import (FEATURE_ROOT, KPMP, decision_scores, load_model, load_tiles,
                         safe_name, save_json, workbook_rows)
+from .tile_annotations import ANNOTATION_FILES, load_annotation_geometry
+
+
+DEFAULT_ANNOTATION_DIR = Path(
+    "/orange/pinaki.sarder/j.fermin/cort_med_wsi/trident_processed/annotations")
 
 
 def aggregate(coords: np.ndarray, scores: np.ndarray, patch: int, stride: int,
@@ -69,8 +75,8 @@ def map_payload(sample_name: str, mode: str, origin: np.ndarray, stride: int,
 
 def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: int,
                         raw: np.ndarray, refined: np.ndarray, seen: np.ndarray,
-                        output_dir: Path) -> None:
-    """Overlay source-grid decisions on the full-slide TRIDENT thumbnail."""
+                        output_dir: Path, annotation_dir: Path | None = None) -> None:
+    """Overlay source-grid decisions and available GT contours on the thumbnail."""
     import h5py
     import matplotlib
     matplotlib.use("Agg")
@@ -104,6 +110,14 @@ def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: in
     mask_cmap = ListedColormap(["#0000ff", "#ff0000"])
     mask_cmap.set_bad(alpha=0)
     output_dir.mkdir(parents=True, exist_ok=True)
+    contours = []
+    if annotation_dir is not None:
+        sample_dir = annotation_dir / h5_path.stem
+        for name, color in (("cortex", "#00ffff"), ("medullary", "#ff69b4")):
+            geometry = load_annotation_geometry(sample_dir / ANNOTATION_FILES[name])
+            for polygon in _polygons(geometry):
+                contours.extend((np.asarray(ring.coords), color)
+                                for ring in (polygon.exterior, *polygon.interiors))
 
     for name, values in (("heatmap", raw), ("refined_heatmap", refined),
                          ("mask", (refined >= 0).astype(np.int8))):
@@ -124,6 +138,9 @@ def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: in
                                     norm=norm, alpha=0.6)
                 fig.colorbar(overlay, ax=ax, label="Signed SVC decision score",
                              fraction=0.046, pad=0.04)
+            for points, color in contours:
+                ax.plot(points[:, 0], points[:, 1], color=color, linewidth=1.5,
+                        zorder=3)
             ax.set_xlim(0, width)
             ax.set_ylim(height, 0)
             ax.set_aspect("equal")
@@ -146,22 +163,27 @@ def main() -> None:
                    help="Save heatmap, refined heatmap, and transparent mask PNG overlays")
     p.add_argument("--visualization-dir", type=Path,
                    default=KPMP / "prediction_visualization")
+    p.add_argument("--annotation-dir", type=Path, default=DEFAULT_ANNOTATION_DIR,
+                   help="Folder with per-slide cortical_gt.json and medullary_gt.json files")
     p.add_argument("--tile-mode", choices=("all", "no-overlap"), default="all",
                    help="Tiles to predict and visualize (default: all)")
     p.add_argument("--gaussian-sigma", type=float, default=1.0,
                    help="Gaussian sigma measured in source-grid cells")
-    p.add_argument("--batch-size", type=int, default=32768)
+    p.add_argument("--batch-size", type=int, default=65536)
     args = p.parse_args()
     if args.gaussian_sigma < 0:
         p.error("--gaussian-sigma must be nonnegative")
     model = load_model(args.model)
+    group_name = f"{args.model.stem}_{args.gaussian_sigma}"
+    output_dir = args.output_dir / group_name
+    visualization_dir = args.visualization_dir / group_name
     expected_mode = model["metadata"].get("tile_mode")
     mode = args.tile_mode
     if expected_mode and mode != expected_mode:
         print(f"NOTE: using {mode} tiles for inference; model was trained with {expected_mode} tiles",
               flush=True)
     rows = workbook_rows(args.xlsx, args.h5_dir, args.split, skip_missing=True)
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     for row in rows.itertuples(index=False):
         sample = load_tiles(row.h5_path, mode, require_labels=False)
         assert sample is not None
@@ -171,15 +193,15 @@ def main() -> None:
         origin, raw, refined, seen = aggregate(sample.coords, scores, sample.patch,
                                                 sample.source_stride, args.gaussian_sigma)
         stem = safe_name(row.h5_name)
-        save_json(args.output_dir / f"{stem}_heatmap.json",
+        save_json(output_dir / f"{stem}_heatmap.json",
                   map_payload(row.sample_name, mode, origin, sample.source_stride, raw, seen, mask=False))
-        save_json(args.output_dir / f"{stem}_refined_heatmap.json",
+        save_json(output_dir / f"{stem}_refined_heatmap.json",
                   map_payload(row.sample_name, mode, origin, sample.source_stride, refined, seen, mask=False))
-        save_json(args.output_dir / f"{stem}_mask.json",
+        save_json(output_dir / f"{stem}_mask.json",
                   map_payload(row.sample_name, mode, origin, sample.source_stride, refined, seen, mask=True))
         if args.visualize:
             save_visualizations(row.h5_path, stem, origin, sample.source_stride,
-                                raw, refined, seen, args.visualization_dir)
+                                raw, refined, seen, visualization_dir, args.annotation_dir)
         output_types = "three JSON maps and three PNG overlays" if args.visualize else "three JSON maps"
         print(f"Saved {output_types} for {row.sample_name} ({int(seen.sum()):,} cells)", flush=True)
 

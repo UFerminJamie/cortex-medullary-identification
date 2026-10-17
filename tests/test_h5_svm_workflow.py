@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import h5py
+import matplotlib
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageChops
 
 from scripts.inference import aggregate, map_payload, save_visualizations
 from scripts.h5_svm import load_tiles, metrics
@@ -63,13 +66,40 @@ class H5SvmWorkflowTests(unittest.TestCase):
             raw = np.array([[-2, 2], [0, 1]], dtype=np.float32)
             refined = np.array([[-1, -0.1], [0, 0.5]], dtype=np.float32)
             seen = np.array([[True, True], [False, True]])
-            save_visualizations(h5_path, "sample", np.array([100, 100]), 100,
-                                raw, refined, seen, output)
+            annotation_dir = job / "annotations"
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt  # Load pyplot before patching Axes.plot.
+            with patch("matplotlib.axes.Axes.plot") as plot:
+                save_visualizations(h5_path, "sample", np.array([100, 100]), 100,
+                                    raw, refined, seen, output, annotation_dir)
+                plot.assert_not_called()
             for suffix in ("heatmap", "refined_heatmap", "mask"):
                 with Image.open(output / f"sample_{suffix}.png") as image:
                     self.assertEqual(image.format, "PNG")
                     self.assertGreater(image.width, 500)
                     self.assertGreater(image.height, 500)
+            with Image.open(output / "sample_mask.png") as image:
+                mask_without_gt = image.convert("RGB").copy()
+
+            sample_dir = annotation_dir / "sample"
+            sample_dir.mkdir(parents=True)
+            for filename, x in (("cortical_gt.json", 20), ("medullary_gt.json", 220)):
+                polygon = {"type": "Polygon", "coordinates": [[[x, 30], [x + 80, 30],
+                            [x + 80, 90], [x, 30]]]}
+                (sample_dir / filename).write_text(json.dumps(polygon), encoding="utf-8")
+            with patch("matplotlib.axes.Axes.plot") as plot:
+                save_visualizations(h5_path, "sample", np.array([100, 100]), 100,
+                                    raw, refined, seen, output, annotation_dir)
+            self.assertEqual(plot.call_count, 6)
+            self.assertEqual([call.kwargs["color"] for call in plot.call_args_list],
+                             ["#00ffff", "#ff69b4"] * 3)
+            np.testing.assert_array_equal(plot.call_args_list[0].args[0], [20, 100, 100, 20])
+            np.testing.assert_array_equal(plot.call_args_list[0].args[1], [30, 30, 90, 30])
+            save_visualizations(h5_path, "sample", np.array([100, 100]), 100,
+                                raw, refined, seen, output, annotation_dir)
+            with Image.open(output / "sample_mask.png") as image:
+                difference = ImageChops.difference(mask_without_gt, image.convert("RGB"))
+                self.assertIsNotNone(difference.getbbox())
 
 
 if __name__ == "__main__":

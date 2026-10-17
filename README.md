@@ -134,29 +134,30 @@ Use the `C` and kernel selected by the grid search, or choose them before lookin
 sbatch svc_train_single.sh --xlsx "$SPLIT_XLSX" --h5-dir "$H5_DIR" --C 2 --kernel rbf --tile-mode all --include-val --model-dir "$JOB_DIR/output/model_weights"
 ```
 
-The model fits on train plus validation, then evaluates once on test. It saves `svc_2_rbf.pkl`, a metrics workbook, and train/test confusion matrix PNGs under `--model-dir`. Use this model with `inference.sh` or `python -m scripts.inference`.
+The model fits on train plus validation, then evaluates once on test. It saves `svc_2_rbf.pkl`, a metrics workbook, and train/test confusion matrix PNGs under `--model-dir/svc_2_rbf/`. Use this model with `inference.sh` or `python -m scripts.inference`.
 
 Flags:
 
 - `--C` and `--kernel`: the selected SVC hyperparameters; kernel is `linear` or `rbf`.
 - `--tile-mode`: use the same `all` or `no-overlap` choice as grid search.
 - `--include-val`: add validation slides to the final fit after model selection.
-- `--model-dir`: destination for the model and evaluation files.
+- `--model-dir`: parent directory for a model-named folder containing the model and evaluation files.
 
 ## Predict and visualize
 
 Use the saved H5 SVC model for a workbook split. This example visualizes the test slides:
 
 ```bash
-sbatch inference.sh --xlsx "$SPLIT_XLSX" --h5-dir "$H5_DIR" --model "$JOB_DIR/output/model_weights/svc_2_rbf.pkl" --split test --output-dir "$JOB_DIR/inference_jsons" --visualization-dir "$JOB_DIR/prediction_visualization"
+sbatch inference.sh --xlsx "$SPLIT_XLSX" --h5-dir "$H5_DIR" --model "$JOB_DIR/output/model_weights/svc_2_rbf/svc_2_rbf.pkl" --split test --output-dir "$JOB_DIR/inference_jsons" --visualization-dir "$JOB_DIR/prediction_visualization"
 ```
 
-Inference writes raw heatmap, refined heatmap, and mask JSON files and thumbnail-overlay PNGs per sample. Heatmaps show signed decision scores; the translucent mask thresholds the refined score at zero.
+Inference writes raw heatmap, refined heatmap, and mask JSON files per sample under `--output-dir/svc_2_rbf_1.0/`, and thumbnail-overlay PNGs under `--visualization-dir/svc_2_rbf_1.0/` for the default Gaussian sigma of 1.0. The subfolder name combines the `.pkl` filename stem and Gaussian sigma. Heatmaps show signed decision scores; the translucent mask thresholds the refined score at zero. When matching annotation JSONs exist, all three PNGs also show cortical contours in cyan and medullary contours in pink. Missing annotations leave the PNGs without GT contours.
 
 Flags:
 
 - `--split`: select a workbook split; use a separate holdout workbook for new slides.
 - `--tile-mode all`: predict every H5 tile by default; `no-overlap` selects a sparse grid.
 - `--gaussian-sigma`: smoothing width in source-grid cells; default is `1`.
+- `--annotation-dir`: parent of per-slide annotation folders; defaults to `/orange/pinaki.sarder/j.fermin/cort_med_wsi/trident_processed/annotations`.
 - `--no-visualize`: skip PNG overlays.
-- `--output-dir` and `--visualization-dir`: choose JSON and PNG destinations.
+- `--output-dir` and `--visualization-dir`: choose parent directories for model-and-sigma-named JSON and PNG folders.
