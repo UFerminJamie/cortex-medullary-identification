@@ -9,7 +9,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 
 from .gt_visualization import _polygons
-from .h5_svm import (FEATURE_ROOT, KPMP, decision_scores, load_model, load_tiles,
+from .h5_svm import (FEATURE_ROOT, KPMP, decision_scores, fit_svc, load_model, load_tiles,
                         safe_name, save_json, workbook_rows)
 from .tile_annotations import ANNOTATION_FILES, load_annotation_geometry
 
@@ -73,9 +73,25 @@ def map_payload(sample_name: str, mode: str, origin: np.ndarray, stride: int,
             "cells": cells}
 
 
+def refinement_scores(features: np.ndarray, scores: np.ndarray, threshold: float,
+                      c: float, kernel: str, cache_mb: int, batch_size: int) -> np.ndarray | None:
+    """Fit a slide-specific SVC on confident first-pass predictions, then score every tile."""
+    cortex = scores < -threshold
+    medullary = scores > threshold
+    if not cortex.any() or not medullary.any():
+        return None
+    selected = cortex | medullary
+    labels = medullary[selected].astype(np.int8)
+    print(f"Refinement training: cortex={int(cortex.sum()):,}, "
+          f"medullary={int(medullary.sum()):,} (threshold={threshold:g})", flush=True)
+    model = fit_svc(features[selected], labels, c, kernel, cache_mb)
+    return decision_scores(model, features, batch_size)
+
+
 def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: int,
                         raw: np.ndarray, refined: np.ndarray, seen: np.ndarray,
-                        output_dir: Path, annotation_dir: Path | None = None) -> None:
+                        output_dir: Path, annotation_dir: Path | None = None,
+                        refinement_raw: np.ndarray | None = None) -> None:
     """Overlay source-grid decisions and available GT contours on the thumbnail."""
     import h5py
     import matplotlib
@@ -119,13 +135,18 @@ def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: in
                 contours.extend((np.asarray(ring.coords), color)
                                 for ring in (polygon.exterior, *polygon.interiors))
 
-    for name, values in (("heatmap", raw), ("refined_heatmap", refined),
-                         ("mask", (refined >= 0).astype(np.int8))):
+    maps = [("heatmap", raw), ("refined_heatmap", refined),
+            ("aggregate", (raw >= 0).astype(np.int8)),
+            ("mask", (refined >= 0).astype(np.int8))]
+    if refinement_raw is not None:
+        maps.extend((("refinement", (refinement_raw >= 0).astype(np.int8)),
+                     ("heatmap_refinement", refinement_raw)))
+    for name, values in maps:
         fig, ax = plt.subplots(figsize=(12, 10))
         try:
             ax.imshow(thumbnail, extent=slide_extent, origin="upper")
             visible = np.ma.array(values, mask=~seen)
-            if name == "mask":
+            if name in ("aggregate", "mask", "refinement"):
                 ax.imshow(visible, extent=grid_extent, origin="upper",
                           interpolation="nearest", cmap=mask_cmap,
                           norm=BoundaryNorm([-0.5, 0.5, 1.5], 2), alpha=0.5)
@@ -133,9 +154,13 @@ def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: in
                                    Patch(color="#ff0000", label="Medullary (>= 0)")],
                           loc="lower right")
             else:
+                score_norm = norm
+                if name == "heatmap_refinement":
+                    refinement_limit = max(float(np.max(np.abs(refinement_raw[seen]))), 1e-6)
+                    score_norm = Normalize(vmin=-refinement_limit, vmax=refinement_limit)
                 overlay = ax.imshow(visible, extent=grid_extent, origin="upper",
                                     interpolation="nearest", cmap=score_cmap,
-                                    norm=norm, alpha=0.6)
+                                    norm=score_norm, alpha=0.6)
                 fig.colorbar(overlay, ax=ax, label="Signed SVC decision score",
                              fraction=0.046, pad=0.04)
             for points, color in contours:
@@ -145,7 +170,8 @@ def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: in
             ax.set_ylim(height, 0)
             ax.set_aspect("equal")
             ax.axis("off")
-            ax.set_title(f"{h5_path.stem} {name.replace('_', ' ')}")
+            title = "aggregate class map" if name == "aggregate" else name.replace("_", " ")
+            ax.set_title(f"{h5_path.stem} {title}")
             fig.savefig(output_dir / f"{stem}_{name}.png", dpi=160,
                         bbox_inches="tight")
         finally:
@@ -160,7 +186,7 @@ def main() -> None:
     p.add_argument("--split", required=True, help="Workbook split, e.g. holdout")
     p.add_argument("--output-dir", type=Path, default=KPMP / "inference_jsons")
     p.add_argument("--visualize", action=argparse.BooleanOptionalAction, default=False,
-                   help="Save heatmap, refined heatmap, and transparent mask PNG overlays")
+                   help="Save first-pass maps and per-slide SVC refinement PNG overlays")
     p.add_argument("--visualization-dir", type=Path,
                    default=KPMP / "prediction_visualization")
     p.add_argument("--annotation-dir", type=Path, default=DEFAULT_ANNOTATION_DIR,
@@ -170,10 +196,20 @@ def main() -> None:
     p.add_argument("--gaussian-sigma", type=float, default=1.0,
                    help="Gaussian sigma measured in source-grid cells")
     p.add_argument("--batch-size", type=int, default=65536)
+    p.add_argument("--refinement-threshold", type=float, default=0.4,
+                   help="Train a per-slide SVC from first-pass scores below -T or above +T (default: 0.4)")
+    p.add_argument("--refinement-cache-mb", type=int, default=8192,
+                   help="GPU cache size for the per-slide refinement SVC")
     args = p.parse_args()
     if args.gaussian_sigma < 0:
         p.error("--gaussian-sigma must be nonnegative")
+    if not np.isfinite(args.refinement_threshold) or args.refinement_threshold < 0:
+        p.error("--refinement-threshold must be finite and nonnegative")
+    if args.refinement_cache_mb <= 0:
+        p.error("--refinement-cache-mb must be positive")
     model = load_model(args.model)
+    if args.visualize and not {"C", "kernel"}.issubset(model["metadata"]):
+        p.error("The model metadata needs C and kernel for refinement")
     group_name = f"{args.model.stem}_{args.gaussian_sigma}"
     output_dir = args.output_dir / group_name
     visualization_dir = args.visualization_dir / group_name
@@ -199,10 +235,23 @@ def main() -> None:
                   map_payload(row.sample_name, mode, origin, sample.source_stride, refined, seen, mask=False))
         save_json(output_dir / f"{stem}_mask.json",
                   map_payload(row.sample_name, mode, origin, sample.source_stride, refined, seen, mask=True))
+        refinement_raw = None
         if args.visualize:
+            second_scores = refinement_scores(
+                sample.features, scores, args.refinement_threshold,
+                model["metadata"]["C"], model["metadata"]["kernel"],
+                args.refinement_cache_mb, args.batch_size)
+            if second_scores is None:
+                print(f"SKIP refinement for {row.sample_name}: no confident tiles in both classes",
+                      flush=True)
+            else:
+                _, refinement_raw, _, _ = aggregate(
+                    sample.coords, second_scores, sample.patch, sample.source_stride, 0)
             save_visualizations(row.h5_path, stem, origin, sample.source_stride,
-                                raw, refined, seen, visualization_dir, args.annotation_dir)
-        output_types = "three JSON maps and three PNG overlays" if args.visualize else "three JSON maps"
+                                raw, refined, seen, visualization_dir, args.annotation_dir,
+                                refinement_raw)
+        png_count = 6 if refinement_raw is not None else 4
+        output_types = f"three JSON maps and {png_count} PNG overlays" if args.visualize else "three JSON maps"
         print(f"Saved {output_types} for {row.sample_name} ({int(seen.sum()):,} cells)", flush=True)
 
 

@@ -13,4 +13,5 @@ set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")}"
 module load conda
 conda activate "${CORT_MED_CONDA_ENV:-/blue/pinaki.sarder/j.fermin/conda/envs/cort_med_gpu}"
+# --visualize saves the aggregate class map and per-slide SVC refinement overlays.
 exec python -m scripts.inference --visualize "$@"

@@ -13,7 +13,7 @@ import matplotlib
 import numpy as np
 from PIL import Image, ImageChops
 
-from scripts.inference import aggregate, map_payload, save_visualizations
+from scripts.inference import aggregate, map_payload, refinement_scores, save_visualizations
 from scripts.h5_svm import load_tiles, metrics
 
 
@@ -49,7 +49,28 @@ class H5SvmWorkflowTests(unittest.TestCase):
         payload = map_payload("sample.svs", "all", origin, 256, refined, seen, mask=True)
         self.assertIn([256, 0, 1], payload["cells"])
 
-    def test_prediction_visualizations_use_thumbnail_and_write_three_pngs(self):
+    def test_refinement_uses_confident_tiles_and_rescores_all_tiles(self):
+        features = np.arange(12, dtype=np.float32).reshape(6, 2)
+        scores = np.array([-0.6, -0.4, 0, 0.4, 0.7, -0.9], dtype=np.float32)
+        rescores = np.array([-1, -0.2, 0.1, 0.2, 1, -2], dtype=np.float32)
+        with patch("scripts.inference.fit_svc", return_value={"svc": "second"}) as fit, \
+             patch("scripts.inference.decision_scores", return_value=rescores) as predict:
+            result = refinement_scores(features, scores, 0.4, 2, "rbf", 8192, 100)
+        np.testing.assert_array_equal(fit.call_args.args[0], features[[0, 4, 5]])
+        np.testing.assert_array_equal(fit.call_args.args[1], [0, 1, 0])
+        self.assertEqual(fit.call_args.args[2:], (2, "rbf", 8192))
+        np.testing.assert_array_equal(predict.call_args.args[1], features)
+        self.assertEqual(predict.call_args.args[2], 100)
+        np.testing.assert_array_equal(result, rescores)
+
+    def test_refinement_skips_slide_without_both_confident_classes(self):
+        features = np.arange(6, dtype=np.float32).reshape(3, 2)
+        scores = np.array([0.1, 0.4, 0.8], dtype=np.float32)
+        with patch("scripts.inference.fit_svc") as fit:
+            self.assertIsNone(refinement_scores(features, scores, 0.4, 2, "rbf", 8192, 100))
+        fit.assert_not_called()
+
+    def test_prediction_visualizations_use_thumbnail_and_write_four_pngs(self):
         with tempfile.TemporaryDirectory() as directory:
             job = Path(directory) / "KPMP"
             feature_dir = job / "40x_512px_256px_overlap" / "features_test"
@@ -73,7 +94,7 @@ class H5SvmWorkflowTests(unittest.TestCase):
                 save_visualizations(h5_path, "sample", np.array([100, 100]), 100,
                                     raw, refined, seen, output, annotation_dir)
                 plot.assert_not_called()
-            for suffix in ("heatmap", "refined_heatmap", "mask"):
+            for suffix in ("heatmap", "refined_heatmap", "aggregate", "mask"):
                 with Image.open(output / f"sample_{suffix}.png") as image:
                     self.assertEqual(image.format, "PNG")
                     self.assertGreater(image.width, 500)
@@ -90,9 +111,9 @@ class H5SvmWorkflowTests(unittest.TestCase):
             with patch("matplotlib.axes.Axes.plot") as plot:
                 save_visualizations(h5_path, "sample", np.array([100, 100]), 100,
                                     raw, refined, seen, output, annotation_dir)
-            self.assertEqual(plot.call_count, 6)
+            self.assertEqual(plot.call_count, 8)
             self.assertEqual([call.kwargs["color"] for call in plot.call_args_list],
-                             ["#00ffff", "#ff69b4"] * 3)
+                             ["#00ffff", "#ff69b4"] * 4)
             np.testing.assert_array_equal(plot.call_args_list[0].args[0], [20, 100, 100, 20])
             np.testing.assert_array_equal(plot.call_args_list[0].args[1], [30, 30, 90, 30])
             save_visualizations(h5_path, "sample", np.array([100, 100]), 100,
@@ -100,6 +121,17 @@ class H5SvmWorkflowTests(unittest.TestCase):
             with Image.open(output / "sample_mask.png") as image:
                 difference = ImageChops.difference(mask_without_gt, image.convert("RGB"))
                 self.assertIsNotNone(difference.getbbox())
+
+            second_raw = np.array([[1, -2], [0, 0.5]], dtype=np.float32)
+            with patch("matplotlib.axes.Axes.plot") as plot:
+                save_visualizations(h5_path, "sample", np.array([100, 100]), 100,
+                                    raw, refined, seen, output, annotation_dir, second_raw)
+            self.assertEqual(plot.call_count, 12)
+            self.assertEqual([call.kwargs["color"] for call in plot.call_args_list],
+                             ["#00ffff", "#ff69b4"] * 6)
+            for suffix in ("refinement", "heatmap_refinement"):
+                with Image.open(output / f"sample_{suffix}.png") as image:
+                    self.assertEqual(image.format, "PNG")
 
 
 if __name__ == "__main__":

@@ -151,13 +151,17 @@ Use the saved H5 SVC model for a workbook split. This example visualizes the tes
 sbatch inference.sh --xlsx "$SPLIT_XLSX" --h5-dir "$H5_DIR" --model "$JOB_DIR/output/model_weights/svc_2_rbf/svc_2_rbf.pkl" --split test --output-dir "$JOB_DIR/inference_jsons" --visualization-dir "$JOB_DIR/prediction_visualization"
 ```
 
-Inference writes raw heatmap, refined heatmap, and mask JSON files per sample under `--output-dir/svc_2_rbf_1.0/`, and thumbnail-overlay PNGs under `--visualization-dir/svc_2_rbf_1.0/` for the default Gaussian sigma of 1.0. The subfolder name combines the `.pkl` filename stem and Gaussian sigma. Heatmaps show signed decision scores; the translucent mask thresholds the refined score at zero. When matching annotation JSONs exist, all three PNGs also show cortical contours in cyan and medullary contours in pink. Missing annotations leave the PNGs without GT contours.
+Inference writes raw heatmap, refined heatmap, and mask JSON files per sample under `--output-dir/svc_2_rbf_1.0/`, and thumbnail-overlay PNGs under `--visualization-dir/svc_2_rbf_1.0/` for the default Gaussian sigma of 1.0. The four first-pass PNGs are `<sample>_heatmap.png`, `<sample>_refined_heatmap.png`, `<sample>_aggregate.png`, and `<sample>_mask.png`; two additional PNGs show the second SVC's results. The subfolder name combines the `.pkl` filename stem and Gaussian sigma.
+
+Heatmaps show signed decision scores. For each source-grid cell, the raw score is the maximum score among overlapping tiles, so any medullary prediction wins a cortex/medullary conflict. The aggregate PNG thresholds this unsmoothed score at zero; the translucent mask thresholds the refined score after Gaussian smoothing. During visualization, inference also fits a separate SVC for each slide using first-pass scores below `-0.4` as cortex and above `0.4` as medullary. It scores every tile again and saves `<sample>_refinement.png` (second-pass class map at zero) and `<sample>_heatmap_refinement.png` (second-pass signed score map). The second SVC uses the saved model's `C` and kernel. If either confident class is absent, these two PNGs are skipped for that slide. This is self-training on the model's own predictions, so incorrect first-pass labels may carry into the second pass. When matching annotation JSONs exist, all PNGs also show cortical contours in cyan and medullary contours in pink. Missing annotations leave the PNGs without GT contours.
 
 Flags:
 
 - `--split`: select a workbook split; use a separate holdout workbook for new slides.
 - `--tile-mode all`: predict every H5 tile by default; `no-overlap` selects a sparse grid.
 - `--gaussian-sigma`: smoothing width in source-grid cells; default is `1`.
+- `--refinement-threshold`: positive and negative first-pass score cutoffs for second-SVC training; default is `0.4`.
+- `--refinement-cache-mb`: GPU cache size for the per-slide SVC; default is `8192`.
 - `--annotation-dir`: parent of per-slide annotation folders; defaults to `/orange/pinaki.sarder/j.fermin/cort_med_wsi/trident_processed/annotations`.
-- `--no-visualize`: skip PNG overlays.
+- `--no-visualize`: skip PNG overlays and the per-slide refinement fit.
 - `--output-dir` and `--visualization-dir`: choose parent directories for model-and-sigma-named JSON and PNG folders.
