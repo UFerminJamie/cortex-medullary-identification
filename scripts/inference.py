@@ -230,7 +230,7 @@ def contour_payload(sample_name: str, cortex: Any | None, medullary: Any | None,
         for polygon in _polygons(geometry):
             elements.append(_polygon_element(polygon, class_name, fill_rgb, alpha))
         documents.append({
-            "name": (class_name if layer == "mask_gt"
+            "name": (f"{class_name} mask gt" if layer == "mask_gt"
                      else f"{class_name} {layer.replace('_', ' ')}"),
             "description": f"{class_name.capitalize()} {layer.replace('_', ' ')} in level-zero WSI coordinates",
             "attributes": {
@@ -331,7 +331,7 @@ def _save_json_new(path: Path, payload: list[dict]) -> None:
             raise
 
 
-def save_sample_exports(output_dir: Path, sample_name: str, heatmap: list[dict],
+def save_sample_exports(output_dir: Path, sample_name: str,
                         refined_heatmap: list[dict], mask_prediction: list[dict],
                         mask_gt: list[dict] | None = None, *,
                         raw_heatmap: list[dict]) -> list[Path]:
@@ -339,7 +339,6 @@ def save_sample_exports(output_dir: Path, sample_name: str, heatmap: list[dict],
     sample_name = Path(str(sample_name)).name
     stem = safe_name(sample_name)
     payloads = [
-        (output_dir / f"{stem}_heatmap.json", heatmap),
         (output_dir / f"{stem}_raw_heatmap.json", raw_heatmap),
         (output_dir / f"{stem}_refined_heatmap.json", refined_heatmap),
         (output_dir / f"{stem}_mask_prediction.json", mask_prediction),
@@ -530,11 +529,6 @@ def main() -> None:
         stem = safe_name(sample_name)
         contours, source_status = load_sample_contours(args.annotation_dir, sample_name)
         tissue_geometry = load_tissue_geometry(args.tissue_mask_dir, sample_name)
-        heatmap = heatmap_payload(
-            sample_name, mode, sample.coords, scores, sample.patch,
-            origin_level0=origin, source_stride=sample.source_stride,
-            tissue_geometry=tissue_geometry,
-        )
         raw_heatmap = heatmap_payload(
             sample_name, mode, sample.coords, scores, sample.patch,
             layer="raw_heatmap", origin_level0=origin,
@@ -564,7 +558,7 @@ def main() -> None:
             tissue_geometry=tissue_geometry, layer="mask_prediction",
         )
         has_gt_sources = any(status != "missing" for status in source_status.values())
-        save_sample_exports(output_dir, sample_name, heatmap, refined_heatmap,
+        save_sample_exports(output_dir, sample_name, refined_heatmap,
                             mask_prediction, mask_gt if has_gt_sources else None,
                             raw_heatmap=raw_heatmap)
         if args.visualize:
@@ -572,7 +566,7 @@ def main() -> None:
                                 raw, refined, seen, visualization_dir, args.annotation_dir,
                                 tissue_geometry=tissue_geometry,
                                 mask_alpha=args.contour_alpha)
-        json_count = 5 if has_gt_sources else 4
+        json_count = 4 if has_gt_sources else 3
         output_types = (f"{json_count} JSON files and 4 PNG overlays"
                         if args.visualize else f"{json_count} JSON files")
         print(f"Saved {output_types} for {sample_name} ({int(seen.sum()):,} cells)", flush=True)
