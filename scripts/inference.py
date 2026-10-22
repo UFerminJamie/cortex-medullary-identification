@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -23,6 +24,17 @@ DEFAULT_ANNOTATION_DIR = Path(
     "/orange/pinaki.sarder/j.fermin/cort_med_wsi/trident_processed/annotations")
 DEFAULT_TISSUE_MASK_DIR = Path(
     "/orange/pinaki.sarder/j.fermin/cort_med_wsi/trident_processed_final/KPMP/contours_geojson")
+
+
+def _alpha_text(alpha: float, significant_digits: int = 6) -> str:
+    """Serialize opacity as fixed-point decimal with the prior output precision."""
+    if not np.isfinite(alpha) or not 0 <= alpha <= 1:
+        raise ValueError("RGBA alpha must be between 0 and 1")
+    rounded = format(float(alpha), f".{significant_digits}g")
+    text = format(Decimal(rounded), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
 
 
 def _polygonal(geometry: Any | None) -> Any | None:
@@ -135,7 +147,7 @@ def heatmap_payload(sample_name: str, mode: str, coords: np.ndarray, scores: np.
                     "width": tile_width,
                     "height": tile_height,
                     "rotation": 0,
-                    "fillColor": f"rgba({fill_rgb}, {scaled_score:.8g})",
+                    "fillColor": f"rgba({fill_rgb}, {_alpha_text(scaled_score, significant_digits=8)})",
                     "lineColor": "rgba(0, 0, 0, 0)",
                     "lineWidth": 0,
                     "user": user,
@@ -196,7 +208,7 @@ def _polygon_element(polygon: Any, class_name: str, fill_rgb: str, alpha: float,
         "points": points,
         "closed": True,
         "holes": holes,
-        "fillColor": f"rgba({fill_rgb}, {alpha:g})",
+        "fillColor": f"rgba({fill_rgb}, {_alpha_text(alpha)})",
         "lineColor": f"rgba({fill_rgb}, 1)",
         "lineWidth": 2,
         "user": {"class": class_name, **(user or {})},
