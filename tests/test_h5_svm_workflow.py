@@ -96,6 +96,23 @@ class H5SvmWorkflowTests(unittest.TestCase):
         self.assertLess(heatmap[0]["elements"][0]["user"]["decision_score"], 0)
         self.assertGreater(heatmap[1]["elements"][0]["user"]["decision_score"], 0)
 
+    def test_small_rgba_alpha_uses_fixed_decimal_notation(self):
+        alpha = 4.43172e-07
+        payload = heatmap_payload(
+            "sample", "all", np.array([[0, 0], [100, 0]]),
+            np.array([1.0, alpha]), 100,
+        )
+        medullary = payload[1]["elements"]
+        tiny_element = next(element for element in medullary
+                            if element["user"]["tile_x"] == 100)
+        expected = "rgba(255, 105, 180, 0.00000044317201)"
+        self.assertEqual(tiny_element["fillColor"], expected)
+        self.assertNotIn("e", tiny_element["fillColor"].lower())
+
+        clipped = contour_payload("sample", box(0, 0, 100, 100), None, alpha)
+        self.assertEqual(clipped[0]["elements"][0]["fillColor"],
+                         "rgba(0, 255, 255, 0.000000443172)")
+
     def test_dsa_heatmap_and_contour_exports_keep_geometry_metadata_and_unique_ids(self):
         coords = np.array([[100, 200], [400, 200], [700, 400]], dtype=np.int64)
         scores = np.array([-4, 2, 1], dtype=np.float32)
