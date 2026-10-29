@@ -66,7 +66,7 @@ fi
 module load conda
 conda activate "$trident_env"
 
-exec python3 "$trident_dir/run_batch_of_slides.py" \
+python3 "$trident_dir/run_batch_of_slides.py" \
   --task all \
   --wsi_dir "$wsi_dir" \
   --job_dir "$job_dir" \
@@ -78,5 +78,10 @@ exec python3 "$trident_dir/run_batch_of_slides.py" \
   --overlap "${OVERLAP:-384}" \
   --gpus "${gpu_ids[@]}" \
   --min_tissue_proportion "${MIN_TISSUE_PROPORTION:-0.5}" \
-  --wsi_ext "${WSI_EXT:-.tif}" \
+  --max_workers "${MAX_WORKERS:-2}" \
+  --clear_dead_locks \
+  --wsi_ext "${WSI_EXT:-.svs}" \
   "$@"
+
+python3 "$project_dir/scripts/normalize_contour_names.py" \
+  "$job_dir/contours_geojson"
