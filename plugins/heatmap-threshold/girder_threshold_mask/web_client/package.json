@@ -1,0 +1,17 @@
+{
+  "name": "@girder/threshold_mask",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Browser-side heatmap threshold analysis for HistomicsUI",
+  "peerDependencies": {
+    "@girder/core": "*",
+    "@girder/histomicsui": "*",
+    "@girder/large_image_annotation": "*"
+  },
+  "main": "./main.js",
+  "girderPlugin": {
+    "name": "threshold_mask",
+    "main": "./main.js",
+    "dependencies": ["histomicsui", "large_image_annotation"]
+  }
+}

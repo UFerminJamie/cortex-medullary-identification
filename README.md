@@ -189,6 +189,10 @@ Flags:
 
 Use the [HPG-ATHENA-Transfer](https://github.com/UFerminJamie/HPG-ATHENA-Transfer) tool to attach annotation JSON documents from HiPerGator to their matching slide items in Athena. It reads the JSON files on HiPerGator and sends their annotation contents through Athena’s Girder API.
 
+## DSA heatmap threshold plugin
+
+The Girder/HistomicsUI plugin for interactively thresholding cortex and medulla heatmaps is in [`plugins/heatmap-threshold`](plugins/heatmap-threshold/README.md). It can be installed into an existing DSA instance from this branch using the `pip` option in that instance's `provision.yaml`; the Compose base image does not need to change.
+
 
 
 

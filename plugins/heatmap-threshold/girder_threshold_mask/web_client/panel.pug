@@ -1,0 +1,35 @@
+.s-panel-title-container
+  span.s-panel-title.h-panel-title cortex-medulla-threshold
+  span.s-panel-controls
+    i.icon-cancel.h-threshold-close(title='Close local analysis')
+.s-panel-content.collapse.in
+  .h-threshold-analysis-content
+    p.h-threshold-analysis-note Runs in this browser. The slider shows translucent filled cortex and medulla regions without contour lines; no job is submitted.
+    if sources.length
+      label(for='h-cortex-source') Cortex source heatmap (optional)
+      select.form-control.h-mask-source#h-cortex-source(data-kind='cortex')
+        option(value='', selected=!maskSources.cortex) None
+        each source in sources
+          option(value=source.id, selected=maskSources.cortex === source.id)= (source.get('annotation') || {}).name
+      label(for='h-medulla-source') Medulla source heatmap (optional)
+      select.form-control.h-mask-source#h-medulla-source(data-kind='medulla')
+        option(value='', selected=!maskSources.medulla) None
+        each source in sources
+          option(value=source.id, selected=maskSources.medulla === source.id)= (source.get('annotation') || {}).name
+      p.h-threshold-analysis-note Both selected heatmaps feed one threshold split. Regions can change class in either direction.
+      label(for='h-heatmap-threshold') Threshold: #[strong.h-heatmap-threshold-value #{threshold.toFixed(1)}]
+      input.h-heatmap-threshold#h-heatmap-threshold(type='range', min='-5', max='5', step='0.1', value=threshold)
+      label(for='h-heatmap-threshold-number') Type threshold
+      input.form-control.h-heatmap-threshold-number#h-heatmap-threshold-number(type='number', min='-5', max='5', step='0.1', value=threshold.toFixed(1))
+      button.btn.btn-sm.btn-default.h-heatmap-reset(type='button') Reset to 0
+      label(for='h-mask-opacity') Mask fill opacity: #[strong.h-mask-opacity-value #{(opacity * 100).toFixed(0)}%]
+      input.h-mask-opacity#h-mask-opacity(type='range', min='0.1', max='0.9', step='0.05', value=opacity)
+      label(for='h-contour-line-width') Saved contour line thickness: #[strong.h-contour-line-width-value #{lineWidth}px]
+      input.h-contour-line-width#h-contour-line-width(type='range', min='0.5', max='8', step='0.5', value=lineWidth)
+      .h-heatmap-threshold-legend
+        span.h-threshold-blue Below: cortex
+        span.h-threshold-red At/above: medulla
+      button.btn.btn-sm.btn-primary.h-mask-save(type='button', disabled=!canSave || saving) Save contour annotations
+    else
+      p No heatmap annotations are available on this slide.
+    .h-mask-status(role='status')= status
