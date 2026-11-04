@@ -201,6 +201,9 @@ Inference writes:
 - `<sample>_mask_prediction.json` — Cortex and medulla polygons thresholded at zero from the raw scores.
 - `<sample>_mask_gt.json` — Ground-truth polygons, written when at least one matching GT source file exists.
 
+The refined heatmap JSON contains two annotations named `cortical heatmap` and
+`medullary heatmap`.
+
 Cortical annotations and masks use RGB `(12, 123, 220)` (`#0C7BDC`); medullary
 annotations and masks use RGB `(255, 194, 10)` (`#FFC20A`).
 

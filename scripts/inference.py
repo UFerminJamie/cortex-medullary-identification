@@ -157,7 +157,8 @@ def heatmap_payload(sample_name: str, mode: str, coords: np.ndarray, scores: np.
                     elements.append(_polygon_element(
                         polygon, class_name, fill_rgb, scaled_score, user=user))
         documents.append({
-            "name": f"{class_name} {layer.replace('_', ' ')}",
+            "name": (f"{class_name} heatmap" if layer == "refined_heatmap"
+                     else f"{class_name} {layer.replace('_', ' ')}"),
             "description": (
                 f"{class_name.capitalize()} tiles with signed SVC decision scores; "
                 "opacity is scaled by the maximum score magnitude within this class"
