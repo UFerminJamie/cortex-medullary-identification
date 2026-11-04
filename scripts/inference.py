@@ -138,7 +138,7 @@ def heatmap_payload(sample_name: str, mode: str, coords: np.ndarray, scores: np.
                 "tile_width": tile_width,
                 "tile_height": tile_height,
             }
-            fill_rgb = "0, 255, 255" if class_name == "cortical" else "255, 105, 180"
+            fill_rgb = "12, 123, 220" if class_name == "cortical" else "255, 194, 10"
             if clipped.equals(footprint):
                 elements.append({
                     "type": "rectangle",
@@ -157,7 +157,8 @@ def heatmap_payload(sample_name: str, mode: str, coords: np.ndarray, scores: np.
                     elements.append(_polygon_element(
                         polygon, class_name, fill_rgb, scaled_score, user=user))
         documents.append({
-            "name": f"{class_name} {layer.replace('_', ' ')}",
+            "name": (f"{class_name} heatmap" if layer == "refined_heatmap"
+                     else f"{class_name} {layer.replace('_', ' ')}"),
             "description": (
                 f"{class_name.capitalize()} tiles with signed SVC decision scores; "
                 "opacity is scaled by the maximum score magnitude within this class"
@@ -173,7 +174,7 @@ def heatmap_payload(sample_name: str, mode: str, coords: np.ndarray, scores: np.
                 "tile_width_level0": tile_width,
                 "tile_height_level0": tile_height,
                 "classes": {"0": "cortex", "1": "medullary"},
-                "colors": {"0": "#00FFFF", "1": "#FF69B4"},
+                "colors": {"0": "#0C7BDC", "1": "#FFC20A"},
                 "scoreColumn": "decision_score",
                 "decision_threshold": 0,
                 "maxMagnitude": maxima,
@@ -235,8 +236,8 @@ def contour_payload(sample_name: str, cortex: Any | None, medullary: Any | None,
     source_status = source_status or {}
     documents = []
     for class_name, geometry, fill_rgb, source_key in (
-        ("cortical", cortical_export, "0, 255, 255", "cortex"),
-        ("medullary", medullary, "255, 105, 180", "medullary"),
+        ("cortical", cortical_export, "12, 123, 220", "cortex"),
+        ("medullary", medullary, "255, 194, 10", "medullary"),
     ):
         elements = []
         for polygon in _polygons(geometry):
@@ -383,7 +384,7 @@ def map_payload(sample_name: str, mode: str, origin: np.ndarray, stride: int,
                                 float(origin[1]) + stride / 2, 0],
                      "dx": stride, "dy": stride, "gridWidth": scores.shape[1],
                      "values": np.where(seen, values, -1).ravel().tolist(),
-                     "colorRange": ["rgba(0,0,255,0.5)", "rgba(255,0,0,0.5)"],
+                     "colorRange": ["rgba(12,123,220,0.5)", "rgba(255,194,10,0.5)"],
                      "rangeValues": [0, 1], "normalizeRange": False,
                      "minColor": "rgba(0,0,0,0)"}]
         description = "0=cortex, 1=medullary; unobserved cells are transparent"
@@ -435,13 +436,13 @@ def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: in
     norm = Normalize(vmin=-limit, vmax=limit)
     score_cmap = plt.get_cmap("coolwarm").copy()
     score_cmap.set_bad(alpha=0)
-    mask_cmap = ListedColormap(["#00ffff", "#ff69b4"])
+    mask_cmap = ListedColormap(["#0c7bdc", "#ffc20a"])
     mask_cmap.set_bad(alpha=0)
     output_dir.mkdir(parents=True, exist_ok=True)
     contours = []
     if annotation_dir is not None:
         sample_dir = annotation_dir / h5_path.stem
-        for name, color in (("cortex", "#00ffff"), ("medullary", "#ff69b4")):
+        for name, color in (("cortex", "#0c7bdc"), ("medullary", "#ffc20a")):
             geometry = load_annotation_geometry(sample_dir / ANNOTATION_FILES[name])
             for polygon in _polygons(geometry):
                 contours.extend((np.asarray(ring.coords), color)
@@ -468,8 +469,8 @@ def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: in
                 ax.imshow(visible, extent=grid_extent, origin="upper",
                           interpolation="nearest", cmap=mask_cmap,
                           norm=BoundaryNorm([-0.5, 0.5, 1.5], 2), alpha=mask_alpha)
-                ax.legend(handles=[Patch(color="#00ffff", label="Cortex (< 0)"),
-                                   Patch(color="#ff69b4", label="Medullary (>= 0)")],
+                ax.legend(handles=[Patch(color="#0c7bdc", label="Cortex (< 0)"),
+                                   Patch(color="#ffc20a", label="Medullary (>= 0)")],
                           loc="lower right")
             else:
                 overlay = ax.imshow(visible, extent=grid_extent, origin="upper",

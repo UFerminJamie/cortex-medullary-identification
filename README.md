@@ -52,6 +52,20 @@ sbatch run_batch_slide.sh "$WSI_DIR" "$JOB_DIR"
 
 The launcher runs `seg → coords → feat`, searches nested `.svs` folders, and defaults to HEST, UNI-v1, 40×, 512-pixel patches, and 384-pixel overlap. UNI-v1 requires access to its gated Hugging Face weights. Completed slide outputs in the same `JOB_DIR` are skipped on rerun. See the [TRIDENT README](https://github.com/mahmoodlab/TRIDENT) for model access and other processing options.
 
+Contour GeoJSON filenames replace semicolons with underscores before they are
+written because GDAL/Fiona treats semicolons as path separators. The launcher
+also normalizes legacy filenames after TRIDENT finishes.
+
+To make existing `contours_geojson` filenames exactly match the corresponding
+`contours` filenames except for the extension, run:
+
+```bash
+python -m scripts.match_contour_geojson_names "$JOB_DIR"
+```
+
+Use `--dry-run` before the job directory to preview planned renames. This can
+restore semicolons in the GeoJSON filenames to match the contour filenames.
+
 Useful flags after the two paths:
 
 - `--task seg`, `--task coords`, or `--task feat`: run one stage instead of `all`.
@@ -85,17 +99,7 @@ python -m scripts.visualize_tile_labels "$H5_DIR/features_uni_v1/SAMPLE.h5" --ov
 
 ## Create train, validation, and test splits
 
-Build a real Excel workbook named `dataset_split.xlsx` from the labeled feature H5 files. Keep it in `JOB_DIR` so an existing workbook in this repository is not replaced:
-
-```bash
-SPLIT_XLSX="$JOB_DIR/dataset_split.xlsx"
-```
-
-```bash
-python -m scripts.split_h5 --job-dir "$JOB_DIR" --features-dir "$H5_DIR/features_uni_v1" --output "$SPLIT_XLSX"
-```
-
-The generator assigns approximately 70%/15%/15% of labeled WSIs to `train`, `val`, and `test` with seed 42. Review and edit the workbook so slides from the same patient stay in one split. Save it as an actual `.xlsx` file, not CSV text renamed to `.xlsx`.
+Build a Excel workbook named `dataset_split.xlsx` from the labeled feature H5 files. Refer to the `dataset_split.xlsx` file.
 
 Workbook columns:
 
@@ -123,6 +127,19 @@ Flags:
 - `--h5-dir DIR`** — Use a different feature H5 folder. It must match the encoder and tile geometry used for inference.
 - `--source FILE` — Use a different source workbook.
 - `--output FILE` — Set the output workbook path.
+
+To create a workbook inventory of WSI files under one directory, including
+nested folders, run:
+
+```bash
+python -m scripts.create_dataset_workbook /path/to/wsis dataset_IU401_529.xlsx
+```
+
+The file extension defaults to `.svs`. Use `--extension` to select another
+extension, with or without the leading dot (for example, `--extension tif`).
+The output workbook lists `sample_name`, `folder_path`, `split`, and tile-count
+columns; newly listed files start as `holdout` with zero tile counts. The script
+refuses to overwrite an existing output workbook.
 
 ## GPU SVC grid search
 
@@ -165,29 +182,24 @@ sbatch inference.sh --xlsx "$SPLIT_XLSX" --h5-dir "$H5_DIR" --model "$JOB_DIR/ou
 
 ### Inference outputs
 
-Outputs are saved under `--output-dir/<model-stem>_<sigma>/` (for example, `svc_2_rbf_1.0/`). Filenames use the workbook sample stem.
-
 Inference writes:
 
-- `<sample>_heatmap.json` — Signed tile scores with class-specific display opacity.
 - `<sample>_raw_heatmap.json` — One signed SVC score per tile. Negative is cortical; zero or positive is medullary. Includes a `raw_heatmap` layer.
-- `<sample>_refined_heatmap.json` — Gaussian-smoothed first-pass heatmap.
-- `<sample>_mask_prediction.json` — Cortex and medulla polygons thresholded at zero on the  `<sample>_heatmap`.
-- `<sample>_mask_gt.json` — Written when at least one matching GT source file exists.
+- `<sample>_refined_heatmap.json` — Gaussian-smoothed scores on the source grid.
+- `<sample>_mask_prediction.json` — Cortex and medulla polygons thresholded at zero from the raw scores.
+- `<sample>_mask_gt.json` — Ground-truth polygons, written when at least one matching GT source file exists.
+
 
 Flags:
 - `--visualize` — generates PNGs to `$JOB_DIR/predictions_visualization`:
-  - `<sample>_heatmap.png`
-  - `<sample>_refined_heatmap.png`
-  - `<sample>_mask_h.png` — Raw heatmap thresholded at zero.
-  - `<sample>_mask_rh.png` — Smoothed heatmap thresholded at zero.
 - `--tissue-mask-dir` — Tissue GeoJSON directory. Defaults to `$JOB_DIR/contours_geojson`.
 - `--annotation-dir` — Directory containing GT JSON annotation files.
 - `--contour-alpha` — Fill opacity for mask JSONs and PNG masks; default `0.35`.
 
+
 ## Transfer annotation JSON files from HiPerGator to Athena
 
-Use the [HPG-ATHENA-Transfer](https://github.com/UFerminJamie/HPG-ATHENA-Transfer) tool to attach annotation JSON documents from HiPerGator to their matching slide items in Athena. It reads the JSON files on HiPerGator and sends their annotation contents through Athena’s Girder API.
+Use the [dsa-annotation-transfer](https://github.com/UFerminJamie/dsa-annotation-transfer) tool to attach annotation JSON documents from HiPerGator to their matching slide items in Athena. It reads the JSON files on HiPerGator and sends their annotation contents through Athena’s Girder API.
 
 
 
