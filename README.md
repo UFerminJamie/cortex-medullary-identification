@@ -99,17 +99,7 @@ python -m scripts.visualize_tile_labels "$H5_DIR/features_uni_v1/SAMPLE.h5" --ov
 
 ## Create train, validation, and test splits
 
-Build a real Excel workbook named `dataset_split.xlsx` from the labeled feature H5 files. Keep it in `JOB_DIR` so an existing workbook in this repository is not replaced:
-
-```bash
-SPLIT_XLSX="$JOB_DIR/dataset_split.xlsx"
-```
-
-```bash
-python -m scripts.split_h5 --job-dir "$JOB_DIR" --features-dir "$H5_DIR/features_uni_v1" --output "$SPLIT_XLSX"
-```
-
-The generator assigns approximately 70%/15%/15% of labeled WSIs to `train`, `val`, and `test` with seed 42. Review and edit the workbook so slides from the same patient stay in one split. Save it as an actual `.xlsx` file, not CSV text renamed to `.xlsx`.
+Build a Excel workbook named `dataset_split.xlsx` from the labeled feature H5 files. Refer to the `dataset_split.xlsx` file.
 
 Workbook columns:
 
@@ -192,8 +182,6 @@ sbatch inference.sh --xlsx "$SPLIT_XLSX" --h5-dir "$H5_DIR" --model "$JOB_DIR/ou
 
 ### Inference outputs
 
-Outputs are saved under `--output-dir/<model-stem>_<sigma>/` (for example, `svc_2_rbf_1.0/`). Filenames use the workbook sample stem.
-
 Inference writes:
 
 - `<sample>_raw_heatmap.json` — One signed SVC score per tile. Negative is cortical; zero or positive is medullary. Includes a `raw_heatmap` layer.
@@ -201,64 +189,17 @@ Inference writes:
 - `<sample>_mask_prediction.json` — Cortex and medulla polygons thresholded at zero from the raw scores.
 - `<sample>_mask_gt.json` — Ground-truth polygons, written when at least one matching GT source file exists.
 
-The refined heatmap JSON contains two annotations named `cortical heatmap` and
-`medullary heatmap`.
-
-Cortical annotations and masks use RGB `(12, 123, 220)` (`#0C7BDC`); medullary
-annotations and masks use RGB `(255, 194, 10)` (`#FFC20A`).
 
 Flags:
 - `--visualize` — generates PNGs to `$JOB_DIR/predictions_visualization`:
-  - `<sample>_heatmap.png`
-  - `<sample>_refined_heatmap.png`
-  - `<sample>_mask_h.png` — Raw heatmap thresholded at zero.
-  - `<sample>_mask_rh.png` — Smoothed heatmap thresholded at zero.
 - `--tissue-mask-dir` — Tissue GeoJSON directory. Defaults to `$JOB_DIR/contours_geojson`.
 - `--annotation-dir` — Directory containing GT JSON annotation files.
 - `--contour-alpha` — Fill opacity for mask JSONs and PNG masks; default `0.35`.
 
-### Refine a mask prediction
-
-Fill polygon holes, keep each class's largest connected component, and remove
-other components below the minimum area (default: 32,768 level-zero WSI pixels²).
-The script writes a separate refined JSON and an original/refined comparison PNG:
-
-```bash
-python -m scripts.postprocess_mask_prediction \
-  /path/to/<sample>_mask_prediction.json \
-  --min-area 32768
-```
-
-Use `--output-json` and `--output-plot` to choose output paths. Component area is
-measured in level-zero WSI pixel².
-
-### Generate interstitial fractional space annotations
-
-For each `<sample>.geojson`, subtract every matching FTU JSON whose filename
-starts with `<sample>_` (for example, tubules, muscular vessels, glomeruli, and
-capillaries). Submit the CPU job with the tissue GeoJSON directory, FTU JSON
-directory, and output folder:
-
-```bash
-sbatch generate_IFS.sh \
-  /orange/pinaki.sarder/j.fermin/cort_med_wsi/trident_processed_final/KPMP/contours_geojson \
-  /path/to/ftu_jsons \
-  /path/to/ifs_jsons \
-  --tolerance 1.0
-```
-
-This writes only `<sample>_IFS.json` as a HistomicsUI contour annotation named
-`IFS`, using light green with 0.5 fill opacity. Existing output files are skipped
-unless `--overwrite` is provided. Slides without matching FTU polygons are
-logged and skipped.
-Only exact stem matches between a GeoJSON and at least one FTU JSON are read
-for generation; unmatched GeoJSONs and FTU files are logged and skipped.
-`--tolerance` applies topology-preserving Douglas-Peucker simplification in
-level-zero WSI pixels; it defaults to `1.0`. Use `--tolerance 0` to disable it.
 
 ## Transfer annotation JSON files from HiPerGator to Athena
 
-Use the [HPG-ATHENA-Transfer](https://github.com/UFerminJamie/HPG-ATHENA-Transfer) tool to attach annotation JSON documents from HiPerGator to their matching slide items in Athena. It reads the JSON files on HiPerGator and sends their annotation contents through Athena’s Girder API.
+Use the [dsa-annotation-transfer](https://github.com/UFerminJamie/dsa-annotation-transfer) tool to attach annotation JSON documents from HiPerGator to their matching slide items in Athena. It reads the JSON files on HiPerGator and sends their annotation contents through Athena’s Girder API.
 
 
 
