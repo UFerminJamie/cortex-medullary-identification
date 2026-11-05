@@ -128,18 +128,6 @@ Flags:
 - `--source FILE` — Use a different source workbook.
 - `--output FILE` — Set the output workbook path.
 
-To create a workbook inventory of WSI files under one directory, including
-nested folders, run:
-
-```bash
-python -m scripts.create_dataset_workbook /path/to/wsis dataset_IU401_529.xlsx
-```
-
-The file extension defaults to `.svs`. Use `--extension` to select another
-extension, with or without the leading dot (for example, `--extension tif`).
-The output workbook lists `sample_name`, `folder_path`, `split`, and tile-count
-columns; newly listed files start as `holdout` with zero tile counts. The script
-refuses to overwrite an existing output workbook.
 
 ## GPU SVC grid search
 
