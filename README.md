@@ -151,8 +151,6 @@ Use the `C` and kernel selected by the grid search, or choose them before lookin
 sbatch svc_train_single.sh --xlsx "$SPLIT_XLSX" --h5-dir "$H5_DIR" --C 2 --kernel rbf --tile-mode all --include-val --model-dir "$JOB_DIR/output/model_weights"
 ```
 
-The model fits on train plus validation, then evaluates once on test. It saves `svc_2_rbf.pkl`, a metrics workbook, and train/test confusion matrix PNGs under `--model-dir/svc_2_rbf/`. Use this model with `inference.sh` or `python -m scripts.inference`.
-
 Flags:
 
 - `--C` and `--kernel`: the selected SVC hyperparameters; kernel is `linear` or `rbf`.
