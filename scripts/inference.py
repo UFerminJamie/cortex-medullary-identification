@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from types import SimpleNamespace
 import json
 from decimal import Decimal
 from pathlib import Path
@@ -494,10 +495,16 @@ def save_visualizations(h5_path: Path, stem: str, origin: np.ndarray, stride: in
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--xlsx", type=Path, required=True)
+    source = p.add_mutually_exclusive_group(required=True)
+    source.add_argument("--xlsx", type=Path)
+    source.add_argument("--h5-file", type=Path,
+                        help="Infer one already-preprocessed slide without a split workbook")
+    p.add_argument("--sample-name", help="Slide stem for --h5-file (defaults to H5 stem)")
+    p.add_argument("--flat-output", action="store_true",
+                   help="Write exports directly in --output-dir for managed jobs")
     p.add_argument("--h5-dir", type=Path, default=FEATURE_ROOT)
     p.add_argument("--model", type=Path, required=True)
-    p.add_argument("--split", required=True, help="Workbook split, e.g. holdout")
+    p.add_argument("--split", help="Workbook split, e.g. holdout")
     p.add_argument("--output-dir", type=Path, default=KPMP / "inference_jsons")
     p.add_argument("--visualize", action=argparse.BooleanOptionalAction, default=False,
                    help="Save heatmap and thresholded-mask PNG overlays")
@@ -515,22 +522,30 @@ def main() -> None:
                    help="Gaussian sigma measured in source-grid cells")
     p.add_argument("--batch-size", type=int, default=65536)
     args = p.parse_args()
+    if args.xlsx and not args.split:
+        p.error("--split is required with --xlsx")
+    if args.h5_file and args.split:
+        p.error("--split is only valid with --xlsx")
     if args.gaussian_sigma < 0:
         p.error("--gaussian-sigma must be nonnegative")
     if not np.isfinite(args.contour_alpha) or not 0 <= args.contour_alpha <= 1:
         p.error("--contour-alpha must be between 0 and 1")
     model = load_model(args.model)
     group_name = f"{args.model.stem}_{args.gaussian_sigma}"
-    output_dir = args.output_dir / group_name
-    visualization_dir = args.visualization_dir / group_name
+    output_dir = args.output_dir if args.flat_output else args.output_dir / group_name
+    visualization_dir = (args.visualization_dir if args.flat_output else
+                         args.visualization_dir / group_name)
     expected_mode = model["metadata"].get("tile_mode")
     mode = args.tile_mode
     if expected_mode and mode != expected_mode:
         print(f"NOTE: using {mode} tiles for inference; model was trained with {expected_mode} tiles",
               flush=True)
-    rows = workbook_rows(args.xlsx, args.h5_dir, args.split, skip_missing=True)
+    rows = ([SimpleNamespace(sample_name=args.sample_name or args.h5_file.stem,
+                             h5_path=args.h5_file)] if args.h5_file else
+            workbook_rows(args.xlsx, args.h5_dir, args.split, skip_missing=True)
+            .itertuples(index=False))
     output_dir.mkdir(parents=True, exist_ok=True)
-    for row in rows.itertuples(index=False):
+    for row in rows:
         sample = load_tiles(row.h5_path, mode, require_labels=False)
         assert sample is not None
         sample_name = Path(str(row.sample_name)).stem

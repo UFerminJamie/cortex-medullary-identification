@@ -1,0 +1,11 @@
+{
+  "CORT_MED_GIRDER_API_URL": "https://athena.example.edu/api/v1",
+  "CORT_MED_SSH_HOST": "hipergator-login.example.edu",
+  "CORT_MED_SSH_USER": "service-account",
+  "CORT_MED_REMOTE_PROJECT_DIR": "/blue/project/cortex-medullary-identification",
+  "CORT_MED_REMOTE_OUTPUT_ROOT": "/blue/project/cort-med-results",
+  "CORT_MED_SLURM_ACCOUNT": "approved-account",
+  "CORT_MED_SLURM_QOS": "approved-qos",
+  "CORT_MED_ALLOWED_FOLDER_IDS": "",
+  "CORT_MED_APPROVED_MODEL_SHA256": ""
+}

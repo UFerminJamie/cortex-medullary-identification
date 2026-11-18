@@ -1,0 +1,6 @@
+**
+!plugin/
+!plugin/entrypoint.py
+!plugin/selection.py
+!plugin/results.py
+!plugin/CorticalMedullaryIdentification.xml

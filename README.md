@@ -187,6 +187,10 @@ Flags:
 
 Use the [dsa-annotation-transfer](https://github.com/UFerminJamie/dsa-annotation-transfer) tool to attach annotation JSON documents from HiPerGator to their matching slide items in Athena. It reads the JSON files on HiPerGator and sends their annotation contents through Athena’s Girder API.
 
+## HistomicsUI CorticalMedullaryIdentification analysis
+
+The new [Slicer CLI Web plugin image and Athena deployment guide](plugin/README.md) add a HistomicsUI side panel for selecting DSA slide and checkpoint files, submitting one L4 HiPerGator Slurm job, monitoring per-slide status, and attaching refined heatmap annotations to the original slide items. It uses the existing SVC inference and annotation format. The two checkpoint selectors currently require the same shared binary `.pkl` model because this repository does not define separate calibrated cortical and medullary models.
+
 
 
 

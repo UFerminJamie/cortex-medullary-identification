@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Cortex and Medulla</category>
+  <title>CorticalMedullaryIdentification</title>
+  <description>Preprocess selected kidney slides on one HiPerGator L4 GPU, infer a shared binary SVC heatmap, and attach native DSA annotations.</description>
+  <version>0.1.0</version>
+  <contributor>Sarder Lab</contributor>
+  <parameters>
+    <label>IO</label>
+    <description>Select DSA resources. The two checkpoint selectors must point to the same binary SVC file produced by this repository.</description>
+    <file fileExtensions=".pkl" reference="_girder_id_">
+      <name>corticalModelCheckpoint</name><longflag>--corticalModelCheckpoint</longflag>
+      <label>Cortical Model Checkpoint</label><channel>input</channel>
+      <description>Shared cortex/medulla SVC .pkl file in DSA.</description>
+    </file>
+    <file fileExtensions=".pkl" reference="_girder_id_">
+      <name>medullaryModelCheckpoint</name><longflag>--medullaryModelCheckpoint</longflag>
+      <label>Medullary Model Checkpoint</label><channel>input</channel>
+      <description>Select the same shared binary checkpoint. Distinct class models require a calibrated model interface.</description>
+    </file>
+    <file fileExtensions=".svs,.tif,.tiff,.ndpi" multiple="true" reference="_girder_id_">
+      <name>inputImage</name><longflag>--inputImage</longflag>
+      <label>Input Image</label><channel>input</channel>
+      <description>Choose one or more DSA slide source files. Use Item Filter (Regular Expression) in the chooser to see matching items before confirming.</description>
+    </file>
+  </parameters>
+  <parameters advanced="true">
+    <label>Additional Options</label>
+    <double>
+      <name>gaussianSigma</name><longflag>--gaussianSigma</longflag>
+      <label>Gaussian sigma (tile grid cells)</label><default>1.0</default>
+      <constraints><minimum>0</minimum><maximum>10</maximum><step>0.1</step></constraints>
+    </double>
+  </parameters>
+  <parameters advanced="true">
+    <label>API config</label>
+    <string>
+      <name>girderApiUrl</name><longflag>--girderApiUrl</longflag>
+      <label>Girder API URL</label>
+      <description>Auto-populated by Slicer CLI Web. Credentials are mounted only on the worker.</description>
+    </string>
+  </parameters>
+</executable>
